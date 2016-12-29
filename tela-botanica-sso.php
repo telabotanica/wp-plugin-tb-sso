@@ -75,6 +75,15 @@ function wp_validate_auth_cookie($cookie = '', $scheme = '') {
 			'hmac' => null,
 			'scheme' => 'auth'
 		);
+
+		/**
+		 * Suppression des cookies WP qui pouvaient traîner : si on est connecté
+		 * à l'aide du SSO, on ne doit plus être connecté d'une autre manière;
+		 * évite de rester connecté, voire changer d'utilisateur, lorsqu'on se
+		 * déconnecte du SSO
+		 */
+		wp_clear_auth_cookie();
+
 	} else { // traitement WP par défaut
 		// @WARNING même déconnecté du SSO, si on a encore un cookie WP on reste
 		// connecté à WP - ce cookie WP n'est pas toujours posé - ??
