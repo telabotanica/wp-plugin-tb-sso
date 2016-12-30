@@ -202,12 +202,8 @@ function wp_logout() {
 	// mécanisme par défaut : suppression des cookies WP
 	wp_destroy_current_session();
 	wp_clear_auth_cookie();
-
-	// suppression du cookie SSO
-	//setcookie($nomCookie, '', -1, '/', null, true); // @TODO config
 	
 	// déconnexion du SSO
-	// @TODO config
 	$deconnexionServiceURL = $adresseServiceSSO;
 	$deconnexionServiceURL = trim($deconnexionServiceURL, '/') . "/deconnexion";
 
@@ -273,7 +269,6 @@ function tb_sso_auth($user, $username, $password) {
 	}
 
 	// connexion au SSO - $username doit toujours être une adresse email
-	// @TODO config
 	$connexionServiceURL = $adresseServiceSSO;
 	$connexionServiceURL = trim($connexionServiceURL, '/') . "/connexion";
 	$connexionServiceURL .= '?login=' . $username . '&password=' . urlencode($password);
@@ -292,8 +287,6 @@ function tb_sso_auth($user, $username, $password) {
 	$jsonData = substr($reponse, $header_size); // corps
 	curl_close($ch);
 
-	//var_dump($jsonData);
-	//var_dump($entetes);
 	// récupération et transmission du cookie SSO posé par le service Auth
 	tb_sso_cookie_proxy($entetes, array($nomCookie));
 
@@ -304,7 +297,6 @@ function tb_sso_auth($user, $username, $password) {
 	if (isset($data['session']) && $data['session'] === true && ! empty($data['token'])) {
 		// décodage du jeton
 		$userData = tb_sso_decode_token($data['token']);
-		//var_dump($userData);
 		// le jeton a-t-il été décodé correctement ?
 		if (empty($userData) || ! is_array($userData)) {
 			$user->add('empty_username', __('<strong>ERREUR</strong>: The username field is empty.'));
@@ -313,17 +305,19 @@ function tb_sso_auth($user, $username, $password) {
 			$user = get_user_by('id', $userData['id']);
 			//var_dump($user);
 			if ($user === false) {
-				// ne devrait jamais se produire tant que le SSO repose sur la table
-				// des utilisateurs WP
+				// ne devrait jamais se produire tant que le SSO repose sur la
+				// table des utilisateurs WP
 				$user = new WP_Error('unknown_user_id', __('<strong>ERREUR</strong>: Utilisateur ' . $userData['id'] . ' introuvable.'));
 			}
 		}
 	} else {
-		$user = new WP_Error('invalid_token', __('<strong>ERREUR</strong>: Connexion au SSO refusée.'));
+		$user = new WP_Error('invalid_token', __('<strong>ERREUR</strong>: Échec de la connexion au SSO.'));
 	}
 
-	remove_action('authenticate', 'wp_authenticate_username_password', 20);
-	//exit;
+	// empêche WP de logger l'utilisateur avec son mécanisme par défaut et force
+	// le SSO; mais en cas de panne de celui-ci, risque d'empêcher de se logger
+	// en admin pour corriger l'erreur - mieux vaut éviter
+	//remove_action('authenticate', 'wp_authenticate_username_password', 20);
 
 	return $user;
 }
@@ -351,7 +345,7 @@ function tb_sso_cookie_proxy($entetes, $noms) {
  * puis les renvoie sous forme d'un tableau de cookies
  * 
  * @TODO filtrer sur le[sous-]domaine pour éviter de transmettre des cookies
- * qui ne concernent pas le client (@WARNING faille de sécurité)
+ * qui ne concernent pas le client (@WARNING faille de sécurité ?)
  * 
  * @param string $entetes une chaîne d'entêtes renvoyée par cURL
  * @return array un tableau de cookies
