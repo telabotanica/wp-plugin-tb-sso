@@ -2,8 +2,8 @@
 /*
  * @wordpress-plugin
  * Plugin Name:       Tela Botanica SSO
- * Plugin URI:        https://github.com/telabotanica/wp-tb-sso
- * GitHub Plugin URI: https://github.com/telabotanica/wp-tb-sso
+ * Plugin URI:        https://github.com/telabotanica/wp-plugin-tb-sso
+ * GitHub Plugin URI: https://github.com/telabotanica/wp-plugin-tb-sso
  * Description:       Intégration du login Wordpress (authentification de l'utilisateur) avec le SSO (Single Sign On) de Tela Botanica
  * Version:           0.1 dev
  * Author:            Tela Botanica
@@ -13,6 +13,9 @@
  * Text Domain:       tela-botanica-plugin
  * Domain Path:       /languages
  */
+
+// menu d'administration
+require_once __DIR__ . '/admin.php';
 
 /**
  * Décode le jeton JWT présent dans le cookie.
@@ -26,7 +29,7 @@
  * 
  * Retourne les données contenues dans le jeton (payload / claims)
  */
-function TB_SSO_decode_token($token) {
+function tb_sso_decode_token($token) {
 	$parts = explode('.', $token);
 	$payload = $parts[1];
 	$payload = base64_decode($payload);
@@ -38,23 +41,24 @@ function TB_SSO_decode_token($token) {
 if (! function_exists('wp_validate_auth_cookie')) :
 /**
  * Fonction qui détecte l'état de l'authentification utilisateur; ajout de
- * la détection du cookie SSO tb_auth
+ * la détection du cookie SSO
  */
 function wp_validate_auth_cookie($cookie = '', $scheme = '') {
-	//echo "Je rgad si ya pas un cookie<br/>";
-	//var_dump($cookie); echo "<br/>";
+	// chargement config
+	$configSSO = tb_sso_charger_config();
+	$nomCookie = $configSSO['cookieName'];
 
 	// vérifier d'abord si un cookie SSO TB est présent
-	if (! empty($_COOKIE['tb_auth'])) { // @TODO config
+	if (! empty($_COOKIE[$nomCookie])) {
 		//echo "Il y a un cookie SSO !<br/>";
-		$userData = TB_SSO_decode_token($_COOKIE['tb_auth']);
+		$userData = tb_sso_decode_token($_COOKIE[$nomCookie]);
 		//var_dump($userData);
 		// le jeton a-t-il été décodé correctement ?
 		if (empty($userData) || ! is_array($userData)) {
-			do_action( 'auth_cookie_malformed', $cookie, $scheme );
+			do_action('auth_cookie_malformed', $cookie, $scheme);
 			return false;
 		}
-		// le jeton est-il encore valide ? @TODO marchera pas sans vérification annuaire
+		// le jeton est-il encore valide ? @TODO ne marchera pas sans vérification annuaire
 		/*$expirationDate = $userData['exp'];
 		if ($expirationDate < time()) {
 			do_action( 'auth_cookie_expired', $cookie_elements );
@@ -64,7 +68,7 @@ function wp_validate_auth_cookie($cookie = '', $scheme = '') {
 		$user = get_user_by('id', $userData['id']);
 		//var_dump($user);
 		if ( ! $user ) {
-			do_action( 'auth_cookie_bad_username', $cookie_elements );
+			do_action('auth_cookie_bad_username', null);
 			return false;
 		}
 		// fabrication d'un $cookie_elements compatible avec la suite du traitement
@@ -80,13 +84,14 @@ function wp_validate_auth_cookie($cookie = '', $scheme = '') {
 		 * Suppression des cookies WP qui pouvaient traîner : si on est connecté
 		 * à l'aide du SSO, on ne doit plus être connecté d'une autre manière;
 		 * évite de rester connecté, voire changer d'utilisateur, lorsqu'on se
-		 * déconnecte du SSO
+		 * déconnecte du SSO;
+		 * n'interdit pas de se connecter avec WP en cas de panne du SSO
 		 */
 		wp_clear_auth_cookie();
 
 	} else { // traitement WP par défaut
-		// @WARNING même déconnecté du SSO, si on a encore un cookie WP on reste
-		// connecté à WP - ce cookie WP n'est pas toujours posé - ??
+		// Indépendamment du SSO, si on est en possession d'un cookie WP on est
+		// considéré comme connecté (sécurité en cas de panne du SSO)
 		if ( ! $cookie_elements = wp_parse_auth_cookie($cookie, $scheme) ) {
 			/**
 			 * Fires if an authentication cookie is malformed.
@@ -178,7 +183,7 @@ function wp_validate_auth_cookie($cookie = '', $scheme = '') {
 	 * @param array   $cookie_elements An array of data for the authentication cookie.
 	 * @param WP_User $user            User object.
 	 */
-	do_action( 'auth_cookie_valid', $cookie_elements, $user );
+	do_action('auth_cookie_valid', $cookie_elements, $user);
 
 	return $user->ID;
 }
@@ -189,49 +194,209 @@ if (! function_exists('wp_logout')) :
  * Déconnecte l'utilisateur de Wordpress et du SSO
  */
 function wp_logout() {
-	echo "Je me déconnecte comme un p'tit fou :-)";
+	// chargement config
+	$configSSO = tb_sso_charger_config();
+	$nomCookie = $configSSO['cookieName'];
+	$adresseServiceSSO = $configSSO['rootURI'];
 
 	// mécanisme par défaut : suppression des cookies WP
 	wp_destroy_current_session();
 	wp_clear_auth_cookie();
 
 	// suppression du cookie SSO
-	setcookie('tb_auth', '', -1, '/', null, false); // @TODO config
-
-	// hook
-	do_action( 'wp_logout' );
-}
-endif;
-
-if (! function_exists('wp_signon')) :
-/**
- * Connecte l'utilisateur à Wordpress et au SSO
- */
-function wp_signon() {
-	echo "Je me connecte comme un guedin :-)";
-
-	//$verificationServiceURL = $this->config['annuaireURL'];
-	/*$verificationServiceURL = 'http://localhost/service:annuaire:auth';
-	$verificationServiceURL = trim($verificationServiceURL, '/') . "/deconnexion";
+	//setcookie($nomCookie, '', -1, '/', null, true); // @TODO config
+	
+	// déconnexion du SSO
+	// @TODO config
+	$deconnexionServiceURL = $adresseServiceSSO;
+	$deconnexionServiceURL = trim($deconnexionServiceURL, '/') . "/deconnexion";
 
 	$ch = curl_init();
 	$timeout = 5;
-	curl_setopt($ch, CURLOPT_URL, $verificationServiceURL);
+	curl_setopt($ch, CURLOPT_URL, $deconnexionServiceURL);
 	curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+	curl_setopt($ch, CURLOPT_HEADER, 1);
 	curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, $timeout);
+	$reponse = curl_exec($ch);
 
-	// equivalent of "-k", ignores SSL self-signed certificate issues
-	// (for local testing only)
-	if (! empty($this->config['ignoreSSLIssues']) && $this->config['ignoreSSLIssues'] === true) {
-		curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-		curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-	}
-
-	$data = curl_exec($ch);
+	// séparation du corps et des entêtes
+	$header_size = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
+	$entetes = substr($reponse, 0, $header_size);
+	//$jsonData = substr($reponse, $header_size); // corps
 	curl_close($ch);
-	//var_dump($data);
-	//return ($info === true);
+
+	//var_dump($jsonData);
+	//var_dump($entetes);
+	// transmission de la suppression du cookie SSO par le service Auth
+	tb_sso_cookie_proxy($entetes, array($nomCookie));
+	// on ne s'occupe pas du corps de la réponse : la déconnexion n'a aucune
+	// raison d'échouer @TODO vérifier cette stratégie (si l'appel échoue ?)
 	//exit;
-	 */
+
+	// décodage du retour du service
+	//$data = json_decode($jsonData, true);
+
+	// hook
+	do_action('wp_logout');
 }
 endif;
+
+/**
+ * Authentification par le SSO
+ * 
+ * Filtre appelé par wp_authenticate($username, $password) au moment où
+ * l'utilisateur valide le formulaire d'authentification
+ * 
+ * Si l'authentification SSO échoue, les autres méthodes d'authentification
+ * seront essayées - permet de se connecter en cas de panne du SSO
+ * 
+ * Une priorité de 10 suffit à l'exécuter avant l'authentification par défaut
+ */
+add_filter('authenticate', 'tb_sso_auth', 10, 3);
+
+function tb_sso_auth($user, $username, $password) {
+	// chargement config
+	$configSSO = tb_sso_charger_config();
+	$nomCookie = $configSSO['cookieName'];
+	$adresseServiceSSO = $configSSO['rootURI'];
+
+	// copié depuis wp_authenticate_username_password()
+	if (empty($username) || empty($password)) {
+		$error = new WP_Error();
+		if (empty($username)) {
+			$error->add('empty_username', __('<strong>ERROR</strong>: The username field is empty.'));
+		}
+		if (empty($password)) {
+			$error->add('empty_password', __('<strong>ERROR</strong>: The password field is empty.'));
+		}
+		return $error;
+	}
+
+	// connexion au SSO - $username doit toujours être une adresse email
+	// @TODO config
+	$connexionServiceURL = $adresseServiceSSO;
+	$connexionServiceURL = trim($connexionServiceURL, '/') . "/connexion";
+	$connexionServiceURL .= '?login=' . $username . '&password=' . urlencode($password);
+
+	$ch = curl_init();
+	$timeout = 5;
+	curl_setopt($ch, CURLOPT_URL, $connexionServiceURL);
+	curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+	curl_setopt($ch, CURLOPT_HEADER, 1);
+	curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, $timeout);
+	$reponse = curl_exec($ch);
+
+	// séparation du corps et des entêtes
+	$header_size = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
+	$entetes = substr($reponse, 0, $header_size);
+	$jsonData = substr($reponse, $header_size); // corps
+	curl_close($ch);
+
+	//var_dump($jsonData);
+	//var_dump($entetes);
+	// récupération et transmission du cookie SSO posé par le service Auth
+	tb_sso_cookie_proxy($entetes, array($nomCookie));
+
+	// décodage du retour du service
+	$data = json_decode($jsonData, true);
+
+	// si la connexion est acceptée ("session": true et jeton non vide)
+	if (isset($data['session']) && $data['session'] === true && ! empty($data['token'])) {
+		// décodage du jeton
+		$userData = tb_sso_decode_token($data['token']);
+		//var_dump($userData);
+		// le jeton a-t-il été décodé correctement ?
+		if (empty($userData) || ! is_array($userData)) {
+			$user->add('empty_username', __('<strong>ERREUR</strong>: The username field is empty.'));
+		} else {
+			// récupération de l'objet utilisateur WP
+			$user = get_user_by('id', $userData['id']);
+			//var_dump($user);
+			if ($user === false) {
+				// ne devrait jamais se produire tant que le SSO repose sur la table
+				// des utilisateurs WP
+				$user = new WP_Error('unknown_user_id', __('<strong>ERREUR</strong>: Utilisateur ' . $userData['id'] . ' introuvable.'));
+			}
+		}
+	} else {
+		$user = new WP_Error('invalid_token', __('<strong>ERREUR</strong>: Connexion au SSO refusée.'));
+	}
+
+	remove_action('authenticate', 'wp_authenticate_username_password', 20);
+	//exit;
+
+	return $user;
+}
+
+/**
+ * Récupère dans les entêtes renvoyés par cURL le cookie SSO posé par le service
+ * Auth, et le transmet au client (proxy de cookie)
+ * 
+ * @param string $entetes une chaîne d'entêtes renvoyée par cURL
+ */
+function tb_sso_cookie_proxy($entetes, $noms) {
+	$cookies = curl_header_parse_cookies($entetes);
+	//echo "<pre>"; var_dump($cookies); echo "</pre>";
+	foreach ($noms as $nom) {
+		if (array_key_exists($nom, $cookies)) {
+			$cookie = $cookies[$nom];
+			// répercussion du cookie @TODO vérifier que tout marche ("secure" notamment)
+			setcookie($nom, $cookie['value'], $cookie['expires'], $cookie['path'], $cookie['domain'], $cookie['secure'], $cookie['httponly']);
+		}
+	}
+}
+
+/**
+ * Découpe une chaîne d'entêtes cURL pour en extraire les directives "SetCookie"
+ * puis les renvoie sous forme d'un tableau de cookies
+ * 
+ * @TODO filtrer sur le[sous-]domaine pour éviter de transmettre des cookies
+ * qui ne concernent pas le client (@WARNING faille de sécurité)
+ * 
+ * @param string $entetes une chaîne d'entêtes renvoyée par cURL
+ * @return array un tableau de cookies
+ */
+function curl_header_parse_cookies($entetes) {
+	// découpage des entêtes
+	$matches = array();
+	preg_match_all('/^Set-Cookie:\s*(.*)/mi', $entetes, $matches);
+
+	// extraction des cookies
+	$cookies = array();
+	foreach($matches[1] as $item) {
+		//var_dump($item);
+		$itemParts = explode('; ', $item);
+		//echo "<pre>"; var_dump($itemParts); echo "</pre>";
+		$cookieNameAndValue = explode('=', trim(array_shift($itemParts)));
+		// formatage et propriétés par défaut
+		$cookie = array(
+			'name' => $cookieNameAndValue[0],
+			'value' => $cookieNameAndValue[1],
+			'expires' => null,
+			'max-age' => null,
+			'path' => null,
+			'domain' => null,
+			'secure' => false,
+			'httponly' => false
+		);
+		// autres propriétés
+		foreach ($itemParts as $ip) {
+			$kv = explode('=', $ip);
+			if (is_array($kv) && count($kv) == 2) {
+				$k = strtolower(trim($kv[0]));
+				$v = trim($kv[1]);
+				// traitements spécifiques
+				switch ($k) {
+					case 'expires':
+						$v = strtotime($v);
+						break;
+					default:
+				}
+				$cookie[$k] = $v;
+			}
+		}
+		$cookies[$cookieNameAndValue[0]] = $cookie;
+	}
+
+	return $cookies;
+}
