@@ -331,11 +331,11 @@ function tb_sso_auth($user, $username, $password) {
 function tb_sso_cookie_proxy($entetes, $noms) {
 	$cookies = curl_header_parse_cookies($entetes);
 	//echo "<pre>"; var_dump($cookies); echo "</pre>";
-	foreach ($noms as $nom) {
-		if (array_key_exists($nom, $cookies)) {
-			$cookie = $cookies[$nom];
-			// répercussion du cookie @TODO vérifier que tout marche ("secure" notamment)
-			setcookie($nom, $cookie['value'], $cookie['expires'], $cookie['path'], $cookie['domain'], $cookie['secure'], $cookie['httponly']);
+	foreach ($cookies as $cookie) {
+		if (in_array($cookie['name'], $noms)) {
+			//echo "Pose de <pre>"; var_dump($cookie); echo "</pre>";
+			// répercussion du cookie @TODO vérifier que tout marche ("domain" et "secure" notamment)
+			setcookie($cookie['name'], $cookie['value'], $cookie['expires'], $cookie['path'], $cookie['domain'], $cookie['secure'], $cookie['httponly']);
 		}
 	}
 }
@@ -386,10 +386,16 @@ function curl_header_parse_cookies($entetes) {
 						break;
 					default:
 				}
+				//echo "K:[$k] / V:[$v]   ";
 				$cookie[$k] = $v;
+			} else {
+				// propriété unique (ex: "secure")
+				$ip = trim($ip);
+				$cookie[$ip] = true;
 			}
 		}
-		$cookies[$cookieNameAndValue[0]] = $cookie;
+		//echo "-----------------------<pre>"; var_dump($cookie); echo "\n</pre>-------------------";
+		$cookies[] = $cookie;
 	}
 
 	return $cookies;
