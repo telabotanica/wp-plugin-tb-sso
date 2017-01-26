@@ -32,10 +32,20 @@ require_once __DIR__ . '/admin.php';
 function tb_sso_decode_token($token) {
 	$parts = explode('.', $token);
 	$payload = $parts[1];
-	$payload = base64_decode($payload);
+	$payload = urlsafeB64Decode($payload);
 	$payload = json_decode($payload, true);
 
 	return $payload;
+}
+
+// copié depuis firebase/JWT
+function urlsafeB64Decode($input) {
+	$remainder = strlen($input) % 4;
+	if ($remainder) {
+		$padlen = 4 - $remainder;
+		$input .= str_repeat('=', $padlen);
+	}
+	return base64_decode(strtr($input, '-_', '+/'));
 }
 
 if (! function_exists('wp_validate_auth_cookie')) :
@@ -299,7 +309,7 @@ function tb_sso_auth($user, $username, $password) {
 		$userData = tb_sso_decode_token($data['token']);
 		// le jeton a-t-il été décodé correctement ?
 		if (empty($userData) || ! is_array($userData)) {
-			$user->add('empty_username', __('<strong>ERREUR</strong>: The username field is empty.'));
+			$user = new WP_Error('empty_username', __('<strong>ERREUR</strong>: The username field is empty.'));
 		} else {
 			// récupération de l'objet utilisateur WP
 			$user = get_user_by('id', $userData['id']);
