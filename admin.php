@@ -61,12 +61,12 @@ function tb_menu_sso() {
 		<?php screen_icon(); ?>
 
 		<!-- Titre -->
-		<h2>Configuration du SSO Tela Botanica</h2>
+		<h2><?php _e("Configuration du SSO Tela Botanica", 'telabotanica') ?></h2>
 
 		<!-- Description -->
 		<div class="description">
 			<p>
-				Permet de synchroniser le login Wordpress avec le login du SSO Tela Botanica
+				<?php _e("Permet de synchroniser le login Wordpress avec le login du SSO Tela Botanica", 'telabotanica') ?>
 			</p>
 		</div>
 
@@ -89,7 +89,7 @@ function tb_menu_sso() {
 		?>
 				<!-- Confirmation de l'enregistrement -->
 				<div class="updated">
-					<p><strong>Mise à jour effectuée</strong></p>
+					<p><strong><?php _e("Changes saved") ?></strong></p>
 				</div>
 		<?php }	?>
 
@@ -99,20 +99,20 @@ function tb_menu_sso() {
 				<tbody>
 					<tr>
 						<th scope="row">
-							<label>URL du service d'authentification SSO</label>
+							<label><?php _e("URL du service d'authentification SSO", 'telabotanica') ?></label>
 						</th>
 						<td>
 							<input class="regular-text" type="text" name="rootURI" value="<?php echo $configActuelleSSO['rootURI']; ?>" />
-							<p class="description">"Ne pas mettre de "/" (slash) à la fin.</p>
+							<p class="description"><?php _e('Ne pas mettre de "/" (slash) à la fin', 'telabotanica') ?></p>
 						</td>
 					</tr>
 					<tr>
 						<th scope="row">
-							<label>Nom du cookie posé par le SSO</label>
+							<label><?php _e("Nom du cookie posé par le SSO", 'telabotanica') ?></label>
 						</th>
 						<td>
 							<input type="text" placeholder="ex: tb_auth" name="cookieName" value="<?php echo $configActuelleSSO['cookieName']; ?>" />
-							<p class="description">Le nom du cookie doit être le même que dans la configuration de l'annuaire TB.</p>
+							<p class="description"><?php _e("Le nom du cookie doit être le même que dans la configuration de l'annuaire TB", 'telabotanica') ?></p>
 						</td>
 					</tr>
 				</tbody>
