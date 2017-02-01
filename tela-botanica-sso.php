@@ -248,6 +248,34 @@ function wp_logout() {
 endif;
 
 /**
+ * Ajout du champ "partenaire" au formulaire de connexion
+ */
+add_action('login_form', 'telabotanica_login_form');
+
+function telabotanica_login_form() {
+	// partenaire sélectionné précédemment, ou par un paramètre GET
+	$partenaire = '';
+	if (isset($_REQUEST['provider'])) {
+		$partenaire = $_REQUEST['provider'];
+	} ?>
+	<p class="login-providers">
+		<?php _e('Se connecter via un compte partenaire', 'telabotanica'); ?><br />
+		<label class="login-provider-default">
+			<input name="provider" value="" type="radio" <?php echo ($partenaire == '') ? 'checked' : '' ?>>
+			<?php _e('non', 'telabotanica'); ?>
+		</label>
+		<label class="login-provider-plantnet">
+			<input name="provider" value="plantnet" type="radio" <?php echo ($partenaire == 'plantnet') ? 'checked' : '' ?>>
+			Pl@ntNet
+		</label>
+		<label class="login-provider-recolnat">
+			<input name="provider" value="recolnat" type="radio" <?php echo ($partenaire == 'recolnat') ? 'checked' : '' ?>>
+			eRecolnat
+		</label>
+	</p>
+<?php }
+
+/**
  * Authentification par le SSO
  * 
  * Filtre appelé par wp_authenticate($username, $password) au moment où
@@ -266,6 +294,12 @@ function tb_sso_auth($user, $username, $password) {
 	$nomCookie = $configSSO['cookieName'];
 	$adresseServiceSSO = $configSSO['rootURI'];
 
+	// a-t-on choisi de se connecter avec un compte partenaire ?
+	$partenaire = ''; // chaîne vide = aucun partenaire (Tela Botanica)
+	if (isset($_REQUEST['provider'])) {
+		$partenaire = $_REQUEST['provider'];
+	}
+
 	// copié depuis wp_authenticate_username_password()
 	if (empty($username) || empty($password)) {
 		$error = new WP_Error();
@@ -282,6 +316,9 @@ function tb_sso_auth($user, $username, $password) {
 	$connexionServiceURL = $adresseServiceSSO;
 	$connexionServiceURL = trim($connexionServiceURL, '/') . "/connexion";
 	$connexionServiceURL .= '?login=' . $username . '&password=' . urlencode($password);
+	if ($partenaire != '') {
+		$connexionServiceURL .= '&partner=' . $partenaire;
+	}
 
 	$ch = curl_init();
 	$timeout = 5;
@@ -313,7 +350,6 @@ function tb_sso_auth($user, $username, $password) {
 		} else {
 			// récupération de l'objet utilisateur WP
 			$user = get_user_by('id', $userData['id']);
-			//var_dump($user);
 			if ($user === false) {
 				// ne devrait jamais se produire tant que le SSO repose sur la
 				// table des utilisateurs WP
