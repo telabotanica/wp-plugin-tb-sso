@@ -259,7 +259,8 @@ function telabotanica_login_form() {
 		$partenaire = $_REQUEST['provider'];
 	} ?>
 	<p class="login-providers">
-		<?php _e('Se connecter via un compte partenaire', 'telabotanica'); ?><br />
+		<span style="cursor: help;" title="<?php esc_attr( _e("Si vous avez déjà un compte sur l'un des sites ci-dessous vous pouvez l'utiliser pour vous connecter à Tela Botanica ; vous n'avez pas besoin de créer un nouveau compte !", 'telabotanica') ); ?>">
+			<?php _e('Se connecter via un compte partenaire', 'telabotanica'); ?></span><br />
 		<label class="login-provider-default">
 			<input name="provider" value="" type="radio" <?php echo ($partenaire == '') ? 'checked' : '' ?>>
 			<?php _e('non', 'telabotanica'); ?>
