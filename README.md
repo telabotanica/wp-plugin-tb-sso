@@ -9,3 +9,6 @@ Copier / cloner ce code dans le répertoire `wp-content/plugins` de Wordpress
 
 ## configuration
 Se rendre dans le Tableau de Bord de Wordpress, dans le menu `SSO`
+
+## important
+Redéfinit la fonction "pluggable" `wp_validate_auth_cookie`
