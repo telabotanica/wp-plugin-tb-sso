@@ -48,6 +48,51 @@ function urlsafeB64Decode($input) {
 	return base64_decode(strtr($input, '-_', '+/'));
 }
 
+/**
+ * Copie de wp_clear_auth_cookie() qui ne touche pas aux "Settings cookies",
+ * dont le nom contient le numéro d'utilisateur (à partir de WP 4.8 c'est le
+ * cas, et ça provoque une boucle infinie)
+ * @TODO vérifier que laisser les cookies en question ne pose pas de problème
+ */
+function tb_clear_auth_cookie() {
+	/**
+	 * Fires just before the authentication cookies are cleared.
+	 *
+	 * @since 2.7.0
+	 */
+	do_action( 'clear_auth_cookie' );
+
+	/** This filter is documented in wp-includes/pluggable.php */
+	if ( ! apply_filters( 'send_auth_cookies', true ) ) {
+		return;
+	}
+
+	// Auth cookies
+	setcookie( AUTH_COOKIE,        ' ', time() - YEAR_IN_SECONDS, ADMIN_COOKIE_PATH,   COOKIE_DOMAIN );
+	setcookie( SECURE_AUTH_COOKIE, ' ', time() - YEAR_IN_SECONDS, ADMIN_COOKIE_PATH,   COOKIE_DOMAIN );
+	setcookie( AUTH_COOKIE,        ' ', time() - YEAR_IN_SECONDS, PLUGINS_COOKIE_PATH, COOKIE_DOMAIN );
+	setcookie( SECURE_AUTH_COOKIE, ' ', time() - YEAR_IN_SECONDS, PLUGINS_COOKIE_PATH, COOKIE_DOMAIN );
+	setcookie( LOGGED_IN_COOKIE,   ' ', time() - YEAR_IN_SECONDS, COOKIEPATH,          COOKIE_DOMAIN );
+	setcookie( LOGGED_IN_COOKIE,   ' ', time() - YEAR_IN_SECONDS, SITECOOKIEPATH,      COOKIE_DOMAIN );
+
+	// Settings cookies
+	// @WARNING appeler get_current_user_id() provoque une boucle infinie
+	//setcookie( 'wp-settings-' . get_current_user_id(),      ' ', time() - YEAR_IN_SECONDS, SITECOOKIEPATH );
+	//setcookie( 'wp-settings-time-' . get_current_user_id(), ' ', time() - YEAR_IN_SECONDS, SITECOOKIEPATH );
+
+	// Old cookies
+	setcookie( AUTH_COOKIE,        ' ', time() - YEAR_IN_SECONDS, COOKIEPATH,     COOKIE_DOMAIN );
+	setcookie( AUTH_COOKIE,        ' ', time() - YEAR_IN_SECONDS, SITECOOKIEPATH, COOKIE_DOMAIN );
+	setcookie( SECURE_AUTH_COOKIE, ' ', time() - YEAR_IN_SECONDS, COOKIEPATH,     COOKIE_DOMAIN );
+	setcookie( SECURE_AUTH_COOKIE, ' ', time() - YEAR_IN_SECONDS, SITECOOKIEPATH, COOKIE_DOMAIN );
+
+	// Even older cookies
+	setcookie( USER_COOKIE, ' ', time() - YEAR_IN_SECONDS, COOKIEPATH,     COOKIE_DOMAIN );
+	setcookie( PASS_COOKIE, ' ', time() - YEAR_IN_SECONDS, COOKIEPATH,     COOKIE_DOMAIN );
+	setcookie( USER_COOKIE, ' ', time() - YEAR_IN_SECONDS, SITECOOKIEPATH, COOKIE_DOMAIN );
+	setcookie( PASS_COOKIE, ' ', time() - YEAR_IN_SECONDS, SITECOOKIEPATH, COOKIE_DOMAIN );
+}
+
 if (! function_exists('wp_validate_auth_cookie')) :
 /**
  * Fonction qui détecte l'état de l'authentification utilisateur; ajout de
@@ -96,8 +141,11 @@ function wp_validate_auth_cookie($cookie = '', $scheme = '') {
 		 * évite de rester connecté, voire changer d'utilisateur, lorsqu'on se
 		 * déconnecte du SSO;
 		 * n'interdit pas de se connecter avec WP en cas de panne du SSO
+		 *
+		 * @WARNING utiliser wp_clear_auth_cookie() provoque une boucle infinie à
+		 * partir de WP 4.8
 		 */
-		wp_clear_auth_cookie();
+		tb_clear_auth_cookie();
 
 	} else { // traitement WP par défaut
 		// Indépendamment du SSO, si on est en possession d'un cookie WP on est
